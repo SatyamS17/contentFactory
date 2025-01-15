@@ -38,7 +38,7 @@ func main() {
 	// Set the options for fetching posts using ListPostOptions
 	opts := &reddit.ListPostOptions{
 		ListOptions: reddit.ListOptions{
-			Limit: 10, // Specify the number of posts to fetch
+			Limit: 2, // Specify the number of posts to fetch
 		},
 		Time: "all",
 	}
@@ -61,7 +61,7 @@ func main() {
 		}
 
 		// Save audio to file
-		fileName := fmt.Sprintf("post_%d.mp3", i+1)
+		fileName := fmt.Sprintf("text-to-speech/post_%d.mp3", i+1)
 		err = os.WriteFile(fileName, audioData, 0644)
 		if err != nil {
 			log.Printf("Failed to save audio file for post %d: %v\n", i+1, err)
