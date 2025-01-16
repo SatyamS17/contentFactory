@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
-	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -41,12 +41,30 @@ type SubtitleEntry struct {
 	Text      string
 }
 
-// estimateDuration calculates approximate duration for a piece of text
-// assuming average speaking rate of 150 words per minute
-func estimateDuration(text string) time.Duration {
-	words := len(strings.Fields(text))
-	// 400ms per word (150 words per minute)
-	return time.Duration(words) * 400 * time.Millisecond
+// Segment represents the transcription output from Whisper
+type Segment struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	Text  string  `json:"text"`
+}
+
+// TranscribeAudio uses a Python Whisper script to transcribe audio
+func TranscribeAudio(audioFile string) ([]Segment, error) {
+	cmd := exec.Command("py", "sub.py", audioFile)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to run whisper script: %v", err)
+	}
+
+	var segments []Segment
+	if err := json.Unmarshal(out.Bytes(), &segments); err != nil {
+		return nil, fmt.Errorf("failed to parse whisper output: %v", err)
+	}
+
+	return segments, nil
 }
 
 // formatDuration converts duration to simplified timestamp format (SS,mmm)
@@ -58,64 +76,9 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d,%03d", s, ms)
 }
 
-// createSubtitles generates subtitle entries from text
-func createSubtitles(text string) []SubtitleEntry {
-	var entries []SubtitleEntry
-	var currentEntry strings.Builder
-	var currentIndex int = 1
-	var currentTime time.Duration = 0
-
-	scanner := bufio.NewScanner(strings.NewReader(text))
-	scanner.Split(bufio.ScanWords)
-
-	wordCount := 0
-
-	for scanner.Scan() {
-		word := scanner.Text()
-		if len(currentEntry.String()) > 0 {
-			currentEntry.WriteString(" ")
-		}
-		currentEntry.WriteString(word)
-		wordCount++
-
-		if wordCount >= 4 ||
-			strings.ContainsAny(word, ".!?") ||
-			currentEntry.Len() > 15 {
-
-			entry := SubtitleEntry{
-				Index:     currentIndex,
-				StartTime: currentTime,
-				Text:      strings.TrimSpace(currentEntry.String()),
-			}
-
-			duration := estimateDuration(entry.Text)
-			entry.EndTime = currentTime + duration
-
-			entries = append(entries, entry)
-			currentIndex++
-			currentTime += duration
-			currentEntry.Reset()
-			wordCount = 0
-		}
-	}
-
-	if currentEntry.Len() > 0 {
-		finalText := strings.TrimSpace(currentEntry.String())
-		duration := estimateDuration(finalText)
-		entries = append(entries, SubtitleEntry{
-			Index:     currentIndex,
-			StartTime: currentTime,
-			EndTime:   currentTime + duration,
-			Text:      finalText,
-		})
-	}
-
-	return entries
-}
-
-// saveSubtitlesToFile saves subtitles in SRT format with simplified timestamps
+// saveSubtitlesToFile saves subtitles with simplified timestamps
 func saveSubtitlesToFile(entries []SubtitleEntry) error {
-	file, err := os.Create(fmt.Sprintf("text-to-speech/subtitles.txt"))
+	file, err := os.Create("text-to-speech/subtitles.txt")
 	if err != nil {
 		return fmt.Errorf("failed to create subtitle file: %v", err)
 	}
@@ -133,6 +96,24 @@ func saveSubtitlesToFile(entries []SubtitleEntry) error {
 	}
 
 	return nil
+}
+
+// ConvertSegmentsToSubtitles converts Whisper segments to subtitle entries
+func ConvertSegmentsToSubtitles(segments []Segment) []SubtitleEntry {
+	var entries []SubtitleEntry
+
+	for i, segment := range segments {
+		start := time.Duration(segment.Start * float64(time.Second))
+		end := time.Duration(segment.End * float64(time.Second))
+		entries = append(entries, SubtitleEntry{
+			Index:     i + 1,
+			StartTime: start,
+			EndTime:   end,
+			Text:      segment.Text,
+		})
+	}
+
+	return entries
 }
 
 func initRedditClient(config RedditConfig) (*reddit.Client, error) {
@@ -220,46 +201,56 @@ func saveTextToSpeech(content AudioContent, azureConfig AzureConfig) error {
 
 func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) error {
 	// Limit the number of posts fetched to one for now
-	opts := &reddit.ListPostOptions{
-		ListOptions: reddit.ListOptions{
-			Limit: 1,
-		},
-		Time: "all",
-	}
+	// opts := &reddit.ListPostOptions{
+	// 	ListOptions: reddit.ListOptions{
+	// 		Limit: 1,
+	// 	},
+	// 	Time: "all",
+	// }
 
-	posts, _, err := client.Subreddit.TopPosts(context.Background(), "AmItheAsshole", opts)
+	// posts, _, err := client.Subreddit.TopPosts(context.Background(), "AmItheAsshole", opts)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to fetch posts: %v", err)
+	// }
+
+	// for i, post := range posts {
+	// 	fmt.Printf("%d. %s\n", i+1, post.Title)
+
+	// 	// Replace the AITA to the full form for when you are converting to text-to-speech
+	// 	if strings.HasPrefix(post.Title, "AITA") {
+	// 		post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
+	// 	}
+
+	// 	contents := []AudioContent{
+	// 		{text: post.Body, fileName: "post_body"},
+	// 		{text: post.Title, fileName: "post_title"},
+	// 	}
+
+	// 	for _, content := range contents {
+	// 		if err := saveTextToSpeech(content, azureConfig); err != nil {
+	// 			log.Printf("Error processing post %d: %v\n", i+1, err)
+	// 			continue
+	// 		}
+	// 	}
+	// py whisper.py text-to-speech/post_body.mp3
+	// Transcribe audio using Whisper
+	segments, err := TranscribeAudio("text-to-speech/post_body.mp3")
 	if err != nil {
-		return fmt.Errorf("failed to fetch posts: %v", err)
+		log.Printf("Error transcribing audio: %v\n", err)
+		// continue
 	}
 
-	for i, post := range posts {
-		fmt.Printf("%d. %s\n", i+1, post.Title)
+	// Convert segments to subtitles
+	subtitles := ConvertSegmentsToSubtitles(segments)
 
-		// Replace the AITA to the full form for when you are converting to text-to-speech
-		if strings.HasPrefix(post.Title, "AITA") {
-			post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
-		}
-
-		contents := []AudioContent{
-			{text: post.Body, fileName: "post_body"},
-			{text: post.Title, fileName: "post_title"},
-		}
-
-		for _, content := range contents {
-			if err := saveTextToSpeech(content, azureConfig); err != nil {
-				log.Printf("Error processing post %d: %v\n", i+1, err)
-				continue
-			}
-		}
-
-		// Generate and save subtitles
-		subtitles := createSubtitles(post.Body)
-		if err := saveSubtitlesToFile(subtitles); err != nil {
-			log.Printf("Error generating subtitles for post %d: %v\n", i+1, err)
-			continue
-		}
-
+	// Save subtitles to file
+	if err := saveSubtitlesToFile(subtitles); err != nil {
+		log.Printf("Error saving subtitles: %v\n", err)
+	} else {
+		log.Printf("Subtitles saved")
 	}
+
+	// }
 
 	return nil
 }
