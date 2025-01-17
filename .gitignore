@@ -1,4 +1,6 @@
 *.env
 *.mp3
 *.mp4
+whisper-env/
 **/__pycache__/
+*.Identifier

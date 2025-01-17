@@ -50,7 +50,7 @@ type Segment struct {
 
 // TranscribeAudio uses a Python Whisper script to transcribe audio
 func TranscribeAudio(audioFile string) ([]Segment, error) {
-	cmd := exec.Command("py", "sub.py", audioFile)
+	cmd := exec.Command("python3", "sub.py", audioFile)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
@@ -78,7 +78,7 @@ func formatDuration(d time.Duration) string {
 
 // saveSubtitlesToFile saves subtitles with simplified timestamps
 func saveSubtitlesToFile(entries []SubtitleEntry) error {
-	file, err := os.Create("text-to-speech/subtitles.txt")
+	file, err := os.Create("audio/text-to-speech/subtitles.txt")
 	if err != nil {
 		return fmt.Errorf("failed to create subtitle file: %v", err)
 	}
@@ -103,14 +103,20 @@ func ConvertSegmentsToSubtitles(segments []Segment) []SubtitleEntry {
 	var entries []SubtitleEntry
 
 	for i, segment := range segments {
+		// Convert start and end times to time.Duration
 		start := time.Duration(segment.Start * float64(time.Second))
 		end := time.Duration(segment.End * float64(time.Second))
-		entries = append(entries, SubtitleEntry{
+
+		// Create a new SubtitleEntry for each segment
+		entry := SubtitleEntry{
 			Index:     i + 1,
 			StartTime: start,
 			EndTime:   end,
 			Text:      segment.Text,
-		})
+		}
+
+		// Append the entry to the list
+		entries = append(entries, entry)
 	}
 
 	return entries
@@ -190,7 +196,7 @@ func saveTextToSpeech(content AudioContent, azureConfig AzureConfig) error {
 		return fmt.Errorf("failed to synthesize speech: %v", err)
 	}
 
-	filePath := fmt.Sprintf("text-to-speech/%s.mp3", content.fileName)
+	filePath := fmt.Sprintf("audio/text-to-speech/%s.mp3", content.fileName)
 	if err := os.WriteFile(filePath, audioData, 0644); err != nil {
 		return fmt.Errorf("failed to save audio file: %v", err)
 	}
@@ -234,7 +240,7 @@ func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) error {
 	// 	}
 	// py whisper.py text-to-speech/post_body.mp3
 	// Transcribe audio using Whisper
-	segments, err := TranscribeAudio("text-to-speech/post_body.mp3")
+	segments, err := TranscribeAudio("/home/satyam/social/audio/text-to-speech/post_body.mp3")
 	if err != nil {
 		log.Printf("Error transcribing audio: %v\n", err)
 		// continue

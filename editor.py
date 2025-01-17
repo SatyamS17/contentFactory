@@ -29,26 +29,26 @@ def read_subtitle_file(file_path):
     return subtitles
 
 # Load audio
-bodyAudio = AudioFileClip("text-to-speech/post_body.mp3").with_volume_scaled(1.5)
-titleAudio = AudioFileClip("text-to-speech/post_title.mp3").with_volume_scaled(1.5)
-backgroundMusic = AudioFileClip("music.mp3", ).with_volume_scaled(0.2)
+bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
+titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
+backgroundMusic = AudioFileClip("audio/music/music.mp3", ).with_volume_scaled(0.2)
 
 # Load your video
 titleClip = (
-    VideoFileClip("minecraft.mp4")
+    VideoFileClip("video/minecraft.mp4")
     .subclipped(10, 10 + titleAudio.duration)
     .without_audio()
 )
 
 bodyClip = (
-    VideoFileClip("minecraft.mp4")
+    VideoFileClip("video/minecraft.mp4")
     .subclipped(10 + titleAudio.duration, 10 + titleAudio.duration + bodyAudio.duration)
     .without_audio()
 )
 
 # Load and configure your image
 title_image_clip = (
-    ImageClip("reddit.png")
+    ImageClip("video/reddit.png")
     .with_duration(titleAudio.duration)
     .resized(0.4)
     .with_position((10, 215))
@@ -57,7 +57,7 @@ title_image_clip = (
 # Original title text clip (unchanged)
 title_txt_clip = TextClip(
     text="AITA for telling my wife the lock on my daughter's door does not get removed til my brother inlaw and his daughters are out of our house?",
-    font="riffic.otf",
+    font="fonts/Arial.ttf",
     font_size=17,
     color='black',
     size=(325, None),
@@ -65,18 +65,21 @@ title_txt_clip = TextClip(
 ).with_duration(titleAudio.duration).with_position('center')
 
 # Read body subtitles
-body_subtitles = read_subtitle_file("text-to-speech/subtitles.txt")
+body_subtitles = read_subtitle_file("audio/text-to-speech/subtitles.txt")
 
 # Create subtitle clips for body
 body_subtitle_clips = []
 for sub in body_subtitles:
     txt_clip = (TextClip(
         text=sub['text'],
-        font="riffic.otf",
+        font="fonts/Milker.otf",
         font_size=30,
         color='white',
+        stroke_color="black",
+        stroke_width=3,
         size=(325, None),
         method='caption',
+        text_align="center",
     )
     .with_duration(sub['end'] - sub['start'])
     .with_position('center')
@@ -102,4 +105,4 @@ final_audio = CompositeAudioClip([
 final_video = final_video.with_audio(final_audio)
 
 # Export
-final_video.write_videofile("result.mp4", codec="libx264", audio_codec="libmp3lame")
+final_video.write_videofile("video/result.mp4", codec="libx264", audio_codec="libmp3lame")
