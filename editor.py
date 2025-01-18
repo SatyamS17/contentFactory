@@ -1,4 +1,6 @@
 from moviepy import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, ImageClip, concatenate_videoclips, CompositeAudioClip
+import sys
+import os
 
 def read_subtitle_file(file_path):
     subtitles = []
@@ -28,6 +30,12 @@ def read_subtitle_file(file_path):
         i += 1
     return subtitles
 
+# Hide outputs to prevent cluttering terminal
+original_stdout = sys.stdout
+original_stderr = sys.stderr
+sys.stdout = open(os.devnull, 'w')
+sys.stderr = open(os.devnull, 'w')
+
 # Load audio
 bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
 titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
@@ -50,19 +58,9 @@ bodyClip = (
 title_image_clip = (
     ImageClip("video/reddit.png")
     .with_duration(titleAudio.duration)
-    .resized(0.4)
+    .resized(0.57)
     .with_position((10, 215))
 )
-
-# Original title text clip (unchanged)
-title_txt_clip = TextClip(
-    text="AITA for telling my wife the lock on my daughter's door does not get removed til my brother inlaw and his daughters are out of our house?",
-    font="fonts/Arial.ttf",
-    font_size=17,
-    color='black',
-    size=(325, None),
-    method='caption',
-).with_duration(titleAudio.duration).with_position('center')
 
 # Read body subtitles
 body_subtitles = read_subtitle_file("audio/text-to-speech/subtitles.txt")
@@ -88,7 +86,7 @@ for sub in body_subtitles:
     body_subtitle_clips.append(txt_clip)
 
 # Composite video clips
-title_video = CompositeVideoClip([titleClip, title_image_clip, title_txt_clip]).with_duration(titleAudio.duration)
+title_video = CompositeVideoClip([titleClip, title_image_clip]).with_duration(titleAudio.duration)
 body_video = CompositeVideoClip([bodyClip] + body_subtitle_clips).with_duration(bodyAudio.duration)
 
 # Combine video clips
@@ -104,5 +102,11 @@ final_audio = CompositeAudioClip([
 
 final_video = final_video.with_audio(final_audio)
 
+# Show loading bar
+sys.stdout.close()
+sys.stderr.close()
+sys.stdout = original_stdout
+sys.stderr = original_stderr
+
 # Export
-final_video.write_videofile("video/result.mp4", codec="libx264", audio_codec="libmp3lame")
+final_video.write_videofile("video/result.mp4", codec="libx264", audio_codec="libmp3lame", threads=12)

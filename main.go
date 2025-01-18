@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -46,6 +48,10 @@ type Segment struct {
 	Start float64 `json:"start"`
 	End   float64 `json:"end"`
 	Text  string  `json:"text"`
+}
+
+type OEmbedResponse struct {
+	HTML string `json:"html"`
 }
 
 // TranscribeAudio uses a Python Whisper script to transcribe audio
@@ -207,43 +213,78 @@ func saveTextToSpeech(content AudioContent, azureConfig AzureConfig) error {
 
 func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) error {
 	// Limit the number of posts fetched to one for now
-	// opts := &reddit.ListPostOptions{
-	// 	ListOptions: reddit.ListOptions{
-	// 		Limit: 1,
-	// 	},
-	// 	Time: "all",
-	// }
+	opts := &reddit.ListPostOptions{
+		ListOptions: reddit.ListOptions{
+			Limit: 1,
+		},
+		Time: "all",
+	}
 
-	// posts, _, err := client.Subreddit.TopPosts(context.Background(), "AmItheAsshole", opts)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to fetch posts: %v", err)
-	// }
+	posts, _, err := client.Subreddit.TopPosts(context.Background(), "AmItheAsshole", opts)
+	if err != nil {
+		return fmt.Errorf("failed to fetch posts: %v", err)
+	}
 
-	// for i, post := range posts {
-	// 	fmt.Printf("%d. %s\n", i+1, post.Title)
+	// TODO: make each post processing its own go routine (will need to fix file naming and stuff)
+	for i, post := range posts {
+		var wg sync.WaitGroup
 
-	// 	// Replace the AITA to the full form for when you are converting to text-to-speech
-	// 	if strings.HasPrefix(post.Title, "AITA") {
-	// 		post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
-	// 	}
+		// Replace the AITA to the full form for when you are converting to text-to-speech
+		if strings.HasPrefix(post.Title, "AITA") {
+			post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
+		}
 
-	// 	contents := []AudioContent{
-	// 		{text: post.Body, fileName: "post_body"},
-	// 		{text: post.Title, fileName: "post_title"},
-	// 	}
+		contents := []AudioContent{
+			{text: post.Body, fileName: "post_body"},
+			{text: post.Title, fileName: "post_title"},
+		}
 
-	// 	for _, content := range contents {
-	// 		if err := saveTextToSpeech(content, azureConfig); err != nil {
-	// 			log.Printf("Error processing post %d: %v\n", i+1, err)
-	// 			continue
-	// 		}
-	// 	}
-	// py whisper.py text-to-speech/post_body.mp3
+		for _, content := range contents {
+			if err := saveTextToSpeech(content, azureConfig); err != nil {
+				log.Printf("Error processing post %d: %v\n", i+1, err)
+				continue
+			}
+		}
+
+		wg.Add(2)
+		// Get reddit embed (wrap in goroutine later)
+		go getPostImage(post.URL, &wg)
+
+		// Transcribe audio using Whisper (wrap in go routine later)
+		go getSubtitles(&wg)
+
+		wg.Wait()
+	}
+
+	return nil
+}
+
+func getPostImage(url string, wg *sync.WaitGroup) error {
+	fmt.Println("Grabbing reddit post snapshot....")
+	defer wg.Done()
+
+	embedURL := "https://publish.reddit.com/embed?url="
+	cmd := exec.Command("python3", "screenshot.py", embedURL+url)
+	err := cmd.Run()
+
+	if err != nil {
+		return fmt.Errorf("failed to run screenshot script: %v", err)
+	} else {
+		fmt.Println("Got reddit post snapshot!")
+	}
+
+	return nil
+}
+
+func getSubtitles(wg *sync.WaitGroup) {
 	// Transcribe audio using Whisper
+	fmt.Println("Creating subtitles....")
+	defer wg.Done()
+
 	segments, err := TranscribeAudio("/home/satyam/social/audio/text-to-speech/post_body.mp3")
 	if err != nil {
 		log.Printf("Error transcribing audio: %v\n", err)
-		// continue
+		return
 	}
 
 	// Convert segments to subtitles
@@ -253,12 +294,8 @@ func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) error {
 	if err := saveSubtitlesToFile(subtitles); err != nil {
 		log.Printf("Error saving subtitles: %v\n", err)
 	} else {
-		log.Printf("Subtitles saved")
+		log.Printf("Subtitles downloaded!")
 	}
-
-	// }
-
-	return nil
 }
 
 func main() {
@@ -276,5 +313,44 @@ func main() {
 
 	if err := processRedditPosts(client, azureConfig); err != nil {
 		log.Fatalf("Failed to process Reddit posts: %v", err)
+	}
+
+	// Command to run the Python script
+	cmd := exec.Command("python3", "-u", "editor.py")
+
+	// Get the stdout and stderr pipes
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Printf("Error getting stdout: %v\n", err)
+		return
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		fmt.Printf("Error getting stderr: %v\n", err)
+		return
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		fmt.Printf("Error starting command: %v\n", err)
+		return
+	}
+
+	// Function to copy output to stdout in real-time
+	copyOutput := func(reader io.ReadCloser) {
+		defer reader.Close()
+		if _, err := io.Copy(io.Writer(os.Stdout), reader); err != nil {
+			fmt.Printf("Error copying output: %v\n", err)
+		}
+	}
+
+	// Read stdout and stderr in separate goroutines
+	go copyOutput(stdout)
+	go copyOutput(stderr)
+
+	// Wait for the command to finish
+	if err := cmd.Wait(); err != nil {
+		fmt.Printf("Command finished with error: %v\n", err)
 	}
 }
