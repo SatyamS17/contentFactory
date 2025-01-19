@@ -39,7 +39,7 @@ sys.stderr = open(os.devnull, 'w')
 # Load audio
 bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
 titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
-backgroundMusic = AudioFileClip("audio/music/music.mp3", ).with_volume_scaled(0.2)
+backgroundMusic = AudioFileClip("audio/music/music.mp3").with_volume_scaled(0.3)
 
 # Load your video
 titleClip = (
@@ -75,7 +75,7 @@ for sub in body_subtitles:
         color='white',
         stroke_color="black",
         stroke_width=3,
-        size=(325, None),
+        size=(325, 200),
         method='caption',
         text_align="center",
     )
@@ -95,12 +95,27 @@ final_video = concatenate_videoclips([title_video, body_video], method="compose"
 # Combine all audio tracks
 # loopedBackgroundMusic = backgroundMusic.loop(duration=final_video.duration)
 final_audio = CompositeAudioClip([
-    backgroundMusic,
     titleAudio.with_start(0),
     bodyAudio.with_start(titleAudio.duration)
 ])
 
 final_video = final_video.with_audio(final_audio)
+
+# Split the video into parts if it exceeds max_duration
+video_parts = []
+total_duration = final_video.duration
+start_time = 0
+# TODO: Figure out a better split for the clips
+max_duration = 90
+
+while start_time < total_duration:
+    end_time = min(start_time + max_duration, total_duration)
+    part = final_video.subclipped(start_time, end_time)
+
+    if part.duration >= 30:
+        video_parts.append(part)
+        
+    start_time = end_time
 
 # Show loading bar
 sys.stdout.close()
@@ -109,4 +124,33 @@ sys.stdout = original_stdout
 sys.stderr = original_stderr
 
 # Export
-final_video.write_videofile("video/result.mp4", codec="libx264", audio_codec="libmp3lame", threads=12)
+for i, part in enumerate(video_parts):
+    # Get the duration of current video part
+    part_duration = part.duration
+    
+    # Loop or trim background music to match video duration
+    bg_music = backgroundMusic.subclipped(0, part_duration)
+    
+    # Combine audio tracks
+    final_audio = CompositeAudioClip([
+        part.audio,  # Original audio
+        backgroundMusic    # Background music
+    ])
+    
+    # Create new video clip with combined audio
+    final_clip = part.with_audio(final_audio)
+    
+    # Write the final video file
+    output_path = os.path.join(f"video/pending/result_part_{i + 1}.mp4")
+    final_clip.write_videofile(
+        output_path,
+        codec="libx264",
+        audio_codec="libmp3lame",
+        threads=12
+    )
+    
+    # Clean up to free memory
+    final_clip.close()
+    
+# Clean up background music
+backgroundMusic.close()

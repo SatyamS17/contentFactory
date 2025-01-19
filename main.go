@@ -29,6 +29,7 @@ func main() {
 		log.Fatalf("Failed to render video: %v", err)
 	}
 
+	//* TODO: Make the uploading script run on the background so that it uploads periodcally (Research best times to upload) (pending --> published)
 	if err := uploadVideo(); err != nil {
 		log.Fatalf("Failed to upload video: %v", err)
 	}
