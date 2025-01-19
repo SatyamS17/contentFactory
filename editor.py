@@ -33,9 +33,18 @@ def read_subtitle_file(file_path):
 # Hide outputs to prevent cluttering terminal
 original_stdout = sys.stdout
 original_stderr = sys.stderr
-sys.stdout = open(os.devnull, 'w')
-sys.stderr = open(os.devnull, 'w')
 
+def showLogs():
+    sys.stdout.close()
+    sys.stderr.close()
+    sys.stdout = original_stdout
+    sys.stderr = original_stderr
+
+def hideLogs():
+    sys.stdout = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, 'w')
+
+hideLogs()
 # Load audio
 bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
 titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
@@ -117,12 +126,6 @@ while start_time < total_duration:
         
     start_time = end_time
 
-# Show loading bar
-sys.stdout.close()
-sys.stderr.close()
-sys.stdout = original_stdout
-sys.stderr = original_stderr
-
 # Export
 for i, part in enumerate(video_parts):
     # Get the duration of current video part
@@ -140,6 +143,12 @@ for i, part in enumerate(video_parts):
     # Create new video clip with combined audio
     final_clip = part.with_audio(final_audio)
     
+    # Show loading bar
+    sys.stdout.close()
+    sys.stderr.close()
+    sys.stdout = original_stdout
+    sys.stderr = original_stderr
+
     # Write the final video file
     output_path = os.path.join(f"video/pending/result_part_{i + 1}.mp4")
     final_clip.write_videofile(
@@ -148,6 +157,11 @@ for i, part in enumerate(video_parts):
         audio_codec="libmp3lame",
         threads=12
     )
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, 'w')
     
     # Clean up to free memory
     final_clip.close()
