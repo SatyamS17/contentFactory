@@ -1,6 +1,7 @@
 from moviepy import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, ImageClip, concatenate_videoclips, CompositeAudioClip
 import sys
 import os
+import random
 
 def read_subtitle_file(file_path):
     subtitles = []
@@ -41,27 +42,29 @@ def showLogs():
     sys.stderr = original_stderr
 
 def hideLogs():
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
     sys.stdout = open(os.devnull, 'w')
     sys.stderr = open(os.devnull, 'w')
 
 hideLogs()
+
+id = sys.argv[1]
+
 # Load audio
 bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
 titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
 backgroundMusic = AudioFileClip("audio/music/music.mp3").with_volume_scaled(0.3)
 
 # Load your video
-titleClip = (
-    VideoFileClip("video/minecraft.mp4")
-    .subclipped(10, 10 + titleAudio.duration)
-    .without_audio()
-)
+gamePlay = VideoFileClip("video/minecraft.mp4").without_audio()
 
-bodyClip = (
-    VideoFileClip("video/minecraft.mp4")
-    .subclipped(10 + titleAudio.duration, 10 + titleAudio.duration + bodyAudio.duration)
-    .without_audio()
-)
+# Generate a random starting point
+random_start = random.uniform(0, gamePlay.duration - titleAudio.duration - bodyAudio.duration)
+
+# Create subclips with the random starting point
+titleClip = gamePlay.subclipped(random_start, random_start + titleAudio.duration)
+bodyClip = gamePlay.subclipped(random_start + titleAudio.duration, random_start + titleAudio.duration + bodyAudio.duration)
 
 # Load and configure your image
 title_image_clip = (
@@ -131,26 +134,20 @@ for i, part in enumerate(video_parts):
     # Get the duration of current video part
     part_duration = part.duration
     
-    # Loop or trim background music to match video duration
-    bg_music = backgroundMusic.subclipped(0, part_duration)
-    
     # Combine audio tracks
     final_audio = CompositeAudioClip([
         part.audio,  # Original audio
-        backgroundMusic    # Background music
+        backgroundMusic.subclipped(0, min(part_duration, backgroundMusic.duration))
     ])
     
     # Create new video clip with combined audio
     final_clip = part.with_audio(final_audio)
     
     # Show loading bar
-    sys.stdout.close()
-    sys.stderr.close()
-    sys.stdout = original_stdout
-    sys.stderr = original_stderr
+    showLogs()
 
     # Write the final video file
-    output_path = os.path.join(f"video/pending/result_part_{i + 1}.mp4")
+    output_path = os.path.join(f"video/pending/{id}_part_{i + 1}.mp4")
     final_clip.write_videofile(
         output_path,
         codec="libx264",
@@ -158,10 +155,7 @@ for i, part in enumerate(video_parts):
         threads=12
     )
 
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-    sys.stdout = open(os.devnull, 'w')
-    sys.stderr = open(os.devnull, 'w')
+    hideLogs()
     
     # Clean up to free memory
     final_clip.close()

@@ -57,7 +57,7 @@ def transcribe_audio(audio_file):
             raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
         # Load the model and transcribe
-        model = whisper.load_model("base", device="cuda")  # Use GPU for inference
+        model = whisper.load_model("small", device="cuda")  # Use GPU for inference
         result = model.transcribe(audio_file, word_timestamps=True)
 
         # Split each segment into shorter segments

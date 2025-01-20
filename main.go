@@ -21,24 +21,29 @@ func main() {
 
 	log.Println("Reddit client created successfully!")
 
-	if err := processRedditPosts(client, azureConfig); err != nil {
+	post, err := processRedditPosts(client, azureConfig)
+	if err != nil {
 		log.Fatalf("Failed to process Reddit posts: %v", err)
 	}
 
-	if err := renderFinalVideo(); err != nil {
+	if err := renderFinalVideo(post.ID); err != nil {
 		log.Fatalf("Failed to render video: %v", err)
 	}
 
-	//* TODO: Make the uploading script run on the background so that it uploads periodcally (Research best times to upload) (pending --> published)
-	// if err := uploadVideo(); err != nil {
-	// 	log.Fatalf("Failed to upload video: %v", err)
-	// }
+	// Save processed id into done list after completing the render
+	if err := saveProcessedID(post.ID); err != nil {
+		log.Fatalf("Failed to save id to hisory: %v", err)
+	}
 
+	//* TODO: Make the uploading script run on the background so that it uploads periodcally (Research best times to upload) (pending --> published)
+	if err := uploadVideo(post); err != nil {
+		log.Fatalf("Failed to upload video: %v", err)
+	}
 }
 
-func renderFinalVideo() error {
+func renderFinalVideo(id string) error {
 	// Command to run the Python script
-	cmd := exec.Command("python3", "-u", "editor.py")
+	cmd := exec.Command("python3", "-u", "editor.py", id)
 
 	// Get the stdout and stderr pipes
 	stdout, err := cmd.StdoutPipe()
