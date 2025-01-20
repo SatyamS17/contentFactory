@@ -5,6 +5,7 @@ import sys
 import os
 import warnings
 
+# TODO: Play around with the # of words on the screen at a time since it gets long sometimes
 def split_segment_into_short_segments(segment, max_words=3):
     """
     Split a segment into multiple shorter segments, each with accurate text and timestamps,

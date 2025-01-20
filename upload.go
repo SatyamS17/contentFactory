@@ -171,6 +171,7 @@ func extractPartNumber(filename string) (int, error) {
 	return partNumber, nil
 }
 
+// TODO: Format this to get the best time to upload the video based on the platform
 func getScheduledTime(partNum int) string {
 	// Calculate the scheduled start time for the next video (in UTC)
 	now := time.Now().UTC()
@@ -178,6 +179,8 @@ func getScheduledTime(partNum int) string {
 	return scheduledTime.Format(time.RFC3339) // Format as RFC3339
 }
 
+// TODO: Add ability to upload to Instragram as well
+// TODO: Make each its own go routinue to make uploading faster (might cause issues with the api)
 func uploadVideo(post *reddit.Post) error {
 	if err := godotenv.Load("private/info.env"); err != nil {
 		return err
@@ -256,6 +259,7 @@ func uploadVideo(post *reddit.Post) error {
 		fmt.Printf("Video uploaded successfully! Video ID: %s\n", response.Id)
 
 		// Move the file to published
+		// TODO: Clean up the published directory every once in a while to prevent taking up too much space
 		destPath := "video/published/" + strings.Split(filepath, "/")[2]
 		err = os.Rename(filepath, destPath)
 		if err != nil {

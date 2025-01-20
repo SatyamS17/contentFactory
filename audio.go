@@ -116,6 +116,7 @@ func ConvertSegmentsToSubtitles(segments []Segment) []SubtitleEntry {
 func textToSpeech(text string, config AzureConfig) ([]byte, error) {
 	url := fmt.Sprintf("https://%s.tts.speech.microsoft.com/cognitiveservices/v1", config.Region)
 
+	// TODO: Pick the voice based on the gender of the post's aurthor (M, F)
 	ssml := fmt.Sprintf(`<speak version='1.0' xml:lang='en-US'>
         <voice xml:lang='en-US' xml:gender='Male' name='en-US-AndrewMultilingualNeural'>
             %s

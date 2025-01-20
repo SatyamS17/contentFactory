@@ -54,6 +54,9 @@ id = sys.argv[1]
 # Load audio
 bodyAudio = AudioFileClip("audio/text-to-speech/post_body.mp3").with_volume_scaled(1.5)
 titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_scaled(1.5)
+
+# TODO: Add more possible clips + soundtracks
+# TODO: Figure out where the random temp audio files are coming from
 backgroundMusic = AudioFileClip("audio/music/music.mp3").with_volume_scaled(0.3)
 
 # Load your video
@@ -77,6 +80,8 @@ title_image_clip = (
 # Read body subtitles
 body_subtitles = read_subtitle_file("audio/text-to-speech/subtitles.txt")
 
+# TODO: Make some texts different colors to attract attention
+# TODO: Add sound cues afer some key words
 # Create subtitle clips for body
 body_subtitle_clips = []
 for sub in body_subtitles:
@@ -117,7 +122,7 @@ final_video = final_video.with_audio(final_audio)
 video_parts = []
 total_duration = final_video.duration
 start_time = 0
-# TODO: Figure out a better split for the clips
+# TODO: Figure out a better split for the clips (some never release the last part right now)
 max_duration = 90
 
 while start_time < total_duration:
@@ -143,10 +148,12 @@ for i, part in enumerate(video_parts):
     # Create new video clip with combined audio
     final_clip = part.with_audio(final_audio)
     
+    # TODO: Find a way to hide the long metadata of the clip
     # Show loading bar
     showLogs()
 
     # Write the final video file
+    # TODO: Try to find a way to make this render faster 
     output_path = os.path.join(f"video/pending/{id}_part_{i + 1}.mp4")
     final_clip.write_videofile(
         output_path,
@@ -155,6 +162,7 @@ for i, part in enumerate(video_parts):
         threads=12
     )
 
+    # Hide loading bar
     hideLogs()
     
     # Clean up to free memory

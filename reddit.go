@@ -132,6 +132,7 @@ func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) (*reddit
 	// TODO: Save the pulled posts that wont be used for later to save API calls
 
 	// Replace the AITA to the full form for when you are converting to text-to-speech
+	// TODO: Have some way to fix grammar or define acronyms (M, F, idk, etc..)!
 	if strings.HasPrefix(post.Title, "AITA") {
 		post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
 	}

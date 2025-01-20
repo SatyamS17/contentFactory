@@ -8,6 +8,7 @@ import (
 	"os/exec"
 )
 
+// TODO: Comments and clean up code
 func main() {
 	redditConfig, azureConfig, err := loadConfigs()
 	if err != nil {
@@ -35,7 +36,7 @@ func main() {
 		log.Fatalf("Failed to save id to hisory: %v", err)
 	}
 
-	//* TODO: Make the uploading script run on the background so that it uploads periodcally (Research best times to upload) (pending --> published)
+	//* TODO: Make the uploading script run on the background once a day (Research best times to upload) (pending --> published)
 	if err := uploadVideo(post); err != nil {
 		log.Fatalf("Failed to upload video: %v", err)
 	}
