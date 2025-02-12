@@ -31,6 +31,21 @@ def read_subtitle_file(file_path):
         i += 1
     return subtitles
 
+def get_random_file(directory):
+    # List all files in the directory
+    files = os.listdir(directory)
+    
+    # Filter only files (excluding directories)
+    files = [f for f in files if os.path.isfile(os.path.join(directory, f))]
+    
+    # Check if there are any files
+    if files:
+        # Pick a random file
+        random_file = random.choice(files)
+        return os.path.join(directory, random_file)
+    else:
+        return None  # No files found
+    
 # Hide outputs to prevent cluttering terminal
 original_stdout = sys.stdout
 original_stderr = sys.stderr
@@ -57,10 +72,11 @@ titleAudio = AudioFileClip("audio/text-to-speech/post_title.mp3").with_volume_sc
 
 # TODO: Add more possible clips + soundtracks
 # TODO: Figure out where the random temp audio files are coming from
-backgroundMusic = AudioFileClip("audio/music/music.mp3").with_volume_scaled(0.3)
+backgroundMusic = AudioFileClip(get_random_file("audio/background")).with_volume_scaled(0.2)
 
 # Load your video
-gamePlay = VideoFileClip("video/minecraft.mp4").without_audio()
+# TODO:: Fixed this to cropped so u can add more types of videos
+gamePlay = VideoFileClip(get_random_file("video/gameplay")).without_audio().resized((720, 1280)) 
 
 # Generate a random starting point
 random_start = random.uniform(0, gamePlay.duration - titleAudio.duration - bodyAudio.duration)
@@ -73,8 +89,7 @@ bodyClip = gamePlay.subclipped(random_start + titleAudio.duration, random_start 
 title_image_clip = (
     ImageClip("video/reddit.png")
     .with_duration(titleAudio.duration)
-    .resized(0.57)
-    .with_position((10, 215))
+    .with_position(('center', 'center'))
 )
 
 # Read body subtitles
@@ -88,11 +103,11 @@ for sub in body_subtitles:
     txt_clip = (TextClip(
         text=sub['text'],
         font="fonts/Milker.otf",
-        font_size=30,
+        font_size=55,
         color='white',
         stroke_color="black",
-        stroke_width=3,
-        size=(325, 200),
+        stroke_width=7,
+        size=(720, 720),
         method='caption',
         text_align="center",
     )

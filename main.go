@@ -18,6 +18,7 @@ func main() {
 	client, err := initRedditClient(redditConfig)
 	if err != nil {
 		log.Fatalf("Failed to create Reddit client: %v", err)
+		return
 	}
 
 	log.Println("Reddit client created successfully!")
@@ -25,10 +26,12 @@ func main() {
 	post, err := processRedditPosts(client, azureConfig)
 	if err != nil {
 		log.Fatalf("Failed to process Reddit posts: %v", err)
+		return
 	}
 
 	if err := renderFinalVideo(post.ID); err != nil {
 		log.Fatalf("Failed to render video: %v", err)
+		return
 	}
 
 	// Save processed id into done list after completing the render

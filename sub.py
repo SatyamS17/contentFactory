@@ -6,7 +6,7 @@ import os
 import warnings
 
 # TODO: Play around with the # of words on the screen at a time since it gets long sometimes
-def split_segment_into_short_segments(segment, max_words=3):
+def split_segment_into_short_segments(segment, max_words=3, max_chars=20):
     """
     Split a segment into multiple shorter segments, each with accurate text and timestamps,
     ending early if punctuation like period (.), comma (,), or other symbols are encountered.
@@ -14,13 +14,16 @@ def split_segment_into_short_segments(segment, max_words=3):
     short_segments = []
     words = segment.get("words", [])
     chunk = []
+    char_count = 0
 
     for word in words:
         # Strip leading and trailing spaces from the word
         word["word"] = word["word"].strip()
 
         chunk.append(word)
-        if len(chunk) >= max_words or word["word"][-1] in ".,!?":
+        char_count += len(word["word"])
+
+        if len(chunk) >= max_words or char_count >= max_chars or word["word"][-1] in ".,!?":
             # Clean up trailing punctuation if it's the end of the chunk
             if word["word"][-1] in ".,!?":
                 word["word"] = word["word"][:-1]
@@ -37,6 +40,7 @@ def split_segment_into_short_segments(segment, max_words=3):
                 "text": text
             })
             chunk = []  # Reset the chunk
+            char_count = 0 
 
     # Handle any remaining words in the chunk
     if chunk:
@@ -58,13 +62,13 @@ def transcribe_audio(audio_file):
             raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
         # Load the model and transcribe
-        model = whisper.load_model("small", device="cuda")  # Use GPU for inference
+        model = whisper.load_model("base", device="cpu")  # Use GPU for inference
         result = model.transcribe(audio_file, word_timestamps=True)
 
         # Split each segment into shorter segments
         all_short_segments = []
         for segment in result["segments"]:
-            short_segments = split_segment_into_short_segments(segment, max_words=3)
+            short_segments = split_segment_into_short_segments(segment, max_words=3, max_chars=20)
             all_short_segments.extend(short_segments)
 
         return all_short_segments

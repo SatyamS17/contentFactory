@@ -167,7 +167,7 @@ func saveTextToSpeech(content AudioContent, azureConfig AzureConfig) error {
 	return nil
 }
 
-func getSubtitles(wg *sync.WaitGroup) {
+func getSubtitles(wg *sync.WaitGroup) error {
 	// Transcribe audio using Whisper
 	fmt.Println("Creating subtitles....")
 	defer wg.Done()
@@ -175,7 +175,7 @@ func getSubtitles(wg *sync.WaitGroup) {
 	segments, err := TranscribeAudio("/home/satyam/social/audio/text-to-speech/post_body.mp3")
 	if err != nil {
 		log.Printf("Error transcribing audio: %v\n", err)
-		return
+		return err
 	}
 
 	// Convert segments to subtitles
@@ -184,7 +184,10 @@ func getSubtitles(wg *sync.WaitGroup) {
 	// Save subtitles to file
 	if err := saveSubtitlesToFile(subtitles); err != nil {
 		log.Printf("Error saving subtitles: %v\n", err)
+		return err
 	} else {
 		log.Printf("Subtitles downloaded!")
 	}
+
+	return nil
 }

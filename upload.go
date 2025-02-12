@@ -226,6 +226,11 @@ func uploadVideo(post *reddit.Post) error {
 
 		// Create the video upload object
 		videoTitle := fmt.Sprintf("Part %d | %s", partNum, post.Title)
+
+		if len(videoTitle) > 100 {
+			videoTitle = videoTitle[:100]
+		}
+
 		description := fmt.Sprintf("Credit: %s\n\n%s\n\nURL: %s", post.Author, post.Body, post.URL)
 		fmt.Printf("Uploading video with title: %s\n", videoTitle) // Debug print to check title
 

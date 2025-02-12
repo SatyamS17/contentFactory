@@ -5,3 +5,4 @@ whisper-env/
 **/__pycache__/
 *.Identifier
 private/
+*.gz

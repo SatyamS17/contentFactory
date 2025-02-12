@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -23,10 +24,13 @@ type RedditConfig struct {
 	Password     string
 }
 
+type AcronymMap map[string]string
+
 const (
 	processedPostFile = "video/pending/processedPosts.txt"
 	enviroment        = "private/info.env"
 	embedURL          = "https://publish.reddit.com/embed?url="
+	acronyms          = "audio/text-to-speech/acronyms.json"
 )
 
 func initRedditClient(config RedditConfig) (*reddit.Client, error) {
@@ -121,6 +125,18 @@ func getRandomRedditPosts(client *reddit.Client) ([]*reddit.Post, error) {
 	return unseenPosts, nil
 }
 
+// replaceGenderShortcuts handles "20f" and "15m" type notations and replaces them with full words.
+func replaceGenderShortcuts(text string) string {
+	// Replace "f" (female) and "m" (male) shorthand with full words (case-insensitive)
+	reFemale := regexp.MustCompile(`(?i)(\d+)(f)`)
+	text = reFemale.ReplaceAllString(text, `$1 female`)
+
+	reMale := regexp.MustCompile(`(?i)(\d+)(m)`)
+	text = reMale.ReplaceAllString(text, `$1 male`)
+
+	return text
+}
+
 func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) (*reddit.Post, error) {
 	posts, err := getRandomRedditPosts(client)
 	if err != nil {
@@ -132,13 +148,16 @@ func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) (*reddit
 	// TODO: Save the pulled posts that wont be used for later to save API calls
 
 	// Replace the AITA to the full form for when you are converting to text-to-speech
-	// TODO: Have some way to fix grammar or define acronyms (M, F, idk, etc..)!
+	// TODO: Have simple spelling and typo checks (or maybe leave them for the memes)
 	if strings.HasPrefix(post.Title, "AITA") {
 		post.Title = strings.Replace(post.Title, "AITA", "Am I the asshole", 1)
 	}
 
+	// TODO: Have some way to define acronyms (M, F, idk, etc..)!
+	clearText := replaceGenderShortcuts(post.Body)
+
 	contents := []AudioContent{
-		{text: post.Body, fileName: "post_body"},
+		{text: clearText, fileName: "post_body"},
 		{text: post.Title, fileName: "post_title"},
 	}
 
@@ -151,11 +170,20 @@ func processRedditPosts(client *reddit.Client, azureConfig AzureConfig) (*reddit
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	// Get reddit embed (wrap in goroutine later)
-	go getPostImage(post.URL, &wg)
 
-	// Transcribe audio using Whisper (wrap in go routine later)
-	go getSubtitles(&wg)
+	// Run getPostImage and check for error
+	err = getPostImage(post.URL, &wg)
+	if err != nil {
+		fmt.Println("Error in getPostImage:", err)
+		return nil, err
+	}
+
+	// Run getSubtitles and check for error
+	err = getSubtitles(&wg)
+	if err != nil {
+		fmt.Println("Error in getSubtitles:", err)
+		return nil, err
+	}
 
 	wg.Wait()
 
